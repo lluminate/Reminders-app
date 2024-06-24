@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Restart</title>
+</head>
+<body>
+    <h1>Restart</h1>
+    <button id="restart" onclick="restartApp()" >Restart</button>
+    <button id="cancel" onclick="window.close()">Later</button>
+
+    <script>
+
+        function restartApp() {
+            window.electronAPI.send('app:restart')
+        }
+
+    </script>
+</body>
+</html>

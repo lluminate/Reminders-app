@@ -1,25 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Add Reminder</title>
+    <title>New Reminder</title> 
 </head>
 <body>
     <form>
         <div>
             <label>Enter Event</label>
-            <input type="text" id="event" autofocus>
+            <input type="text" name="event" id="event" autofocus>
         </div>
         <button type="submit">Add</button>
     </form>
-
     <script>
-        const form = document.querySelector('form');
+        const form = document.querySelector('form')
         form.addEventListener('submit', submitForm);
 
         function submitForm(e){
             e.preventDefault();
             const event = document.querySelector('#event').value;
-            window.electronAPI.send('event:add', event);
+            window.electronAPI.send('reminder:add', event);
+            window.close();
         }
     </script>
 </body>

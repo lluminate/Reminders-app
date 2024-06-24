@@ -1,130 +1,304 @@
-const electron = require('electron');
-const url = require('url');
-const path = require('path');
+import electron from 'electron';
+import Store from 'electron-store';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const {app, BrowserWindow, Menu, ipcMain} = electron;
+
+// Set __dirname
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+// Import modules
+const {app, BrowserWindow, Menu, Tray, nativeImage, ipcMain} = electron;
 
 // Set environment
 process.env.NODE_ENV = 'development';
 
-let mainWindow;
-let addWindow;
+// Check environment
+const isDev = process.env.NODE_ENV !== 'production';
 
-// Listen for app to be ready
-app.on('ready', function(){
-    // Create new window
+// Check platform
+const isMac = process.platform === 'darwin';
+
+//Set app name
+app.setName('Reminders');
+
+// Init store & defaults
+const store = new Store();
+
+let mainWindow;
+
+
+// Create main window
+function createMainWindow() {
     mainWindow = new BrowserWindow({
+        title: 'Reminders',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, './renderer/js/preload.js')
         }
     });
-    // Load html into window
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'mainWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));
-    //Quit app when closed
-    mainWindow.on('closed', function(){
-        app.quit();
+
+    // Open dev tools if not in production
+    if(isDev){
+        mainWindow.webContents.openDevTools();
+    }
+
+    mainWindow.loadFile('./renderer/mainWindow.html');
+}
+
+// Create about window
+function createAboutWindow() {
+    let aboutWindow = new BrowserWindow({
+        title: 'About',
+        width: 300,
+        height: 450,
+        resizable: false,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
     });
 
-    // Build menu from template
-    const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
-    // Insert menu
-    Menu.setApplicationMenu(mainMenu);
-});
+    aboutWindow.loadFile('./renderer/about.html');
 
-// Handle create add window
-function createAddWindow(){
-    // Create new window
-    addWindow = new BrowserWindow({
+    // Intercept link clicks to open in external browser
+    aboutWindow.webContents.on('will-navigate', (e, url) => {
+        e.preventDefault();
+        electron.shell.openExternal(url);
+    });
+
+    aboutWindow.show();
+
+    // Garbage collection
+    aboutWindow.on('close', () => {
+        aboutWindow = null;
+    });
+}
+
+//Create Tray
+function createTray() {
+    // check if keepInTray is set to false
+    if (!store.get('keepInTray')) return;
+
+    const icon = nativeImage.createFromPath('./assets/icons/png/icon.png');
+    const tray = new Tray(icon);
+
+    tray.setToolTip('Reminders');
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenu));
+}
+
+// Create add window
+function createAddWindow() {
+    let addWindow = new BrowserWindow({
+        title: 'New Reminder',
         width: 300,
         height: 200,
-        title: 'Add Reminder',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, './renderer/js/preload.js')
         }
     });
-    // Load html into window
-    addWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'addWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));
+
+    addWindow.loadFile('./renderer/newReminder.html');
 
     addWindow.show();
 
-    // Garbage collection handle
-    addWindow.on('closed', function(){
+    // Garbage collection
+    addWindow.on('close', () => {
         addWindow = null;
     });
 }
 
-//catch event:add
-ipcMain.on('event:add', (ipcEvent, event) => {
-    console.log(event);
-    mainWindow.webContents.send('event:add', event);
-    addWindow.close();
+// Create restart window
+function createRestartWindow() {
+    let restartWindow = new BrowserWindow({
+        title: 'Restart Required',
+        width: 300,
+        height: 200,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
+    });
+
+    restartWindow.loadFile('./renderer/restart.html');
+
+    restartWindow.show();
+
+    // Garbage collection
+
+    restartWindow.on('close', () => {
+        restartWindow = null;
+    });
+}
+
+// Create load window
+function createLoadWindow() {
+    let loadWindow = new BrowserWindow({
+        title: 'Load Reminders',
+        width: 300,
+        height: 200,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
+    });
+
+    loadWindow.loadFile('./renderer/loadReminders.html');
+
+    loadWindow.show();
+
+    // Garbage collection
+    loadWindow.on('close', () => {
+        loadWindow = null;
+    });
+}
+
+ipcMain.on('app:restart', () => {
+    app.relaunch();
+    app.quit();
 });
 
-// Create menu template
-const mainMenuTemplate = [
+ipcMain.on('reminder:add', (ipcEvent, event) => {
+    console.log(event);
+    mainWindow.webContents.send('reminder:add', event);
+});
+
+ipcMain.on('reminder:load', (ipcEvent, loadPath) => {
+    store.set('loadPath', loadPath);
+    console.log(store.get('loadPath'));
+});
+
+// Listen for app to be ready
+app.whenReady().then(() => {
+    createMainWindow();
+
+    // Implement menu
+    const mainMenu = Menu.buildFromTemplate(menu);
+    Menu.setApplicationMenu(mainMenu);
+
+    // Implement tray
+    createTray();
+
+    app.on('activate', () => {
+        if(BrowserWindow.getAllWindows().length === 0){
+            createMainWindow();
+        }
+    });
+});
+
+// Menu template
+const menu = [
+    ...(isMac ? [{
+        label: app.name,
+        submenu: [
+            {
+                label: 'About Reminders',
+                click: createAboutWindow
+            },
+            {type: 'separator'},
+            {role: 'quit'}
+        ]
+    }] : []),
     {
         label: 'File',
         submenu: [
             {
-                label: 'Add Item',
-                click(){
-                    createAddWindow();
-                }
+                label: 'New Reminder',
+                accelerator: 'CmdOrCtrl+A',
+                click: createAddWindow
             },
             {
-                label: 'Clear Events',
-                click(){
-                    mainWindow.webContents.send('event:clear');
-                }
+                label: 'Load Reminders',
+                click: createLoadWindow
             },
             {
-                label: 'Quit',
-                accelerator: process.platform == 'darwin' ? 'Command+Q' : 'Ctrl+Q',
-                click(){
-                    app.quit();
+                label: 'Keep in tray',
+                type: 'checkbox',
+                checked: store.get('keepInTray'),
+                tooltip: 'Requires Restart',
+                click: e => {
+                    store.set('keepInTray', e.checked);
+                    createRestartWindow();
+                    console.log('Keep in tray ' + store.get('keepInTray'));
                 }
+            },
+            {type: 'separator'},
+            isMac ? {role: 'close'} : {role: 'quit'}
+        ]
+    },
+    ...(!isMac ? [{
+        label: 'Help',
+        submenu: [
+            {
+                label: 'About',
+                click: createAboutWindow
             }
         ]
+    }] : [])
+];
+
+// Tray menu
+const trayMenu = [
+    {
+        label: 'Open Reminders',
+        click: () => {
+            if(BrowserWindow.getAllWindows().length === 0){
+                createMainWindow();
+            }
+        }
+    },
+    {
+        label: 'New Reminder',
+        click: createAddWindow
+    },
+    {
+        type: 'separator'
+    },
+    {
+        label: 'About Reminders...',
+        click: createAboutWindow
+    },
+    {
+        type: 'separator'
+    },
+    {
+        label: 'Keep in tray',
+        type: 'checkbox',
+        checked: store.get('keepInTray'),
+        tooltip: 'Requires Restart',
+        click: e => {
+            store.set('keepInTray', e.checked);
+            createRestartWindow();
+            console.log('Keep in tray ' + store.get('keepInTray'));
+        }
+    },
+    {
+        label: 'Quit',
+        accelerator: 'CmdOrCtrl+Q',
+        click: () => app.quit()
     }
 ];
 
-// If mac, add empty object to menu
-if(process.platform == 'darwin'){
-    mainMenuTemplate.unshift({label: 'Reminders'});
-}
-
-// Add developer tools item if not in production
-if(process.env.NODE_ENV !== 'production'){
-    mainMenuTemplate.push({
-        label: 'Developer Tools',
+if(isDev){
+    menu.push({
+        label: 'Developer',
         submenu: [
-            {
-                label: 'Toggle DevTools',
-                accelerator: process.platform == 'darwin' ? 'Command+I' : 'Ctrl+I',
-                click(item, focusedWindow){
-                    focusedWindow.toggleDevTools();
-                }
-            },
-
-            {
-                label: 'Reload',
-                accelerator: process.platform == 'darwin' ? 'Command+R' : 'Ctrl+R',
-                click(item, focusedWindow){
-                    focusedWindow.reload();
-                }
-            }
+            {role: 'reload'},
+            {role: 'forcereload'},
+            {type: 'separator'},
+            {role: 'toggledevtools'}
         ]
     });
 }
+
+app.on('window-all-closed', () => {
+    if(!isMac) {
+        app.quit();
+    }
+});

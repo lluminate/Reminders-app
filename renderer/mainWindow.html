@@ -9,18 +9,13 @@
 
 <script>
     const ul = document.querySelector('ul');
-    
+
     // Add event
-    window.electronAPI.receive('event:add', (event) => {
+    window.electronAPI.receive('reminder:add', (event) => {
         const li = document.createElement('li');
         const eventText = document.createTextNode(event);
         li.appendChild(eventText);
         ul.appendChild(li);
-    });
-
-    // Clear events
-    window.electronAPI.receive('event:clear', (event) => {
-        ul.innerHTML = '';
     });
 
     // Remove event
@@ -29,6 +24,8 @@
     function removeEvent(e){
         e.target.remove();
     }
+
+
 </script>
 </body>
 </html>
