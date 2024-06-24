@@ -1,16 +1,22 @@
 const electron = require('electron');
 const url = require('url');
 const path = require('path');
-const { subscribe } = require('diagnostics_channel');
 
-const {app, BrowserWindow, Menu} = electron;
+const {app, BrowserWindow, Menu, ipcMain} = electron;
 
 let mainWindow;
+let addWindow;
 
 // Listen for app to be ready
 app.on('ready', function(){
     // Create new window
-    mainWindow = new BrowserWindow({});
+    mainWindow = new BrowserWindow({
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
+        }
+    });
     // Load html into window
     mainWindow.loadURL(url.format({
         pathname: path.join(__dirname, 'mainWindow.html'),
@@ -34,7 +40,12 @@ function createAddWindow(){
     addWindow = new BrowserWindow({
         width: 300,
         height: 200,
-        title: 'Add Reminder'
+        title: 'Add Reminder',
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
+        }
     });
     // Load html into window
     addWindow.loadURL(url.format({
@@ -42,12 +53,21 @@ function createAddWindow(){
         protocol: 'file:',
         slashes: true
     }));
+
+    addWindow.show();
+
     // Garbage collection handle
-    addWindow.on('close', function(){
+    addWindow.on('closed', function(){
         addWindow = null;
     });
 }
 
+//catch event:add
+ipcMain.on('event:add', (ipcEvent, event) => {
+    console.log(event);
+    mainWindow.webContents.send('event:add', event);
+    addWindow.close();
+});
 
 // Create menu template
 const mainMenuTemplate = [
@@ -61,7 +81,10 @@ const mainMenuTemplate = [
                 }
             },
             {
-                label: 'Clear Items'
+                label: 'Clear Events',
+                click(){
+                    mainWindow.webContents.send('event:clear');
+                }
             },
             {
                 label: 'Quit',
@@ -89,6 +112,14 @@ if(process.env.NODE_ENV !== 'production'){
                 accelerator: process.platform == 'darwin' ? 'Command+I' : 'Ctrl+I',
                 click(item, focusedWindow){
                     focusedWindow.toggleDevTools();
+                }
+            },
+
+            {
+                label: 'Reload',
+                accelerator: process.platform == 'darwin' ? 'Command+R' : 'Ctrl+R',
+                click(item, focusedWindow){
+                    focusedWindow.reload();
                 }
             }
         ]

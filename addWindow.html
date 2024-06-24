@@ -7,9 +7,20 @@
     <form>
         <div>
             <label>Enter Event</label>
-            <input type="text" name="event" autofocus>
+            <input type="text" id="event" autofocus>
         </div>
         <button type="submit">Add</button>
     </form>
+
+    <script>
+        const form = document.querySelector('form');
+        form.addEventListener('submit', submitForm);
+
+        function submitForm(e){
+            e.preventDefault();
+            const event = document.querySelector('#event').value;
+            window.electronAPI.send('event:add', event);
+        }
+    </script>
 </body>
 </html>
