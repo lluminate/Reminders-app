@@ -1,17 +1,23 @@
-const electron = require('electron');
-const { type } = require('os');
-const path = require('path');
+import electron from 'electron';
+import Store from 'electron-store';
+
+// Import modules
+const {app, BrowserWindow, Menu, Tray, nativeImage} = electron;
 
 // Set environment
 process.env.NODE_ENV = 'development';
 
+// Check environment
 const isDev = process.env.NODE_ENV !== 'production';
-const isMac = process.platform === 'darwin';
 
-const {app, BrowserWindow, Menu, Tray, nativeImage} = electron;
+// Check platform
+const isMac = process.platform === 'darwin';
 
 //Set app name
 app.setName('Reminders');
+
+// Init store & defaults
+const store = new Store();
 
 // Create main window
 function createMainWindow() {
@@ -24,7 +30,7 @@ function createMainWindow() {
         mainWindow.webContents.openDevTools();
     }
 
-    mainWindow.loadFile(path.join(__dirname, './renderer/mainWindow.html'));
+    mainWindow.loadFile('./renderer/mainWindow.html');
 }
 
 // Create about window
@@ -36,7 +42,7 @@ function createAboutWindow() {
         resizable: false,
     });
 
-    aboutWindow.loadFile(path.join(__dirname, './renderer/about.html'));
+    aboutWindow.loadFile('./renderer/about.html');
 
     // Intercept link clicks to open in external browser
     aboutWindow.webContents.on('will-navigate', (e, url) => {
@@ -47,7 +53,10 @@ function createAboutWindow() {
 
 //Create Tray
 function createTray() {
-    const icon = nativeImage.createFromPath(path.join(__dirname, './assets/icons/png/icon.png'));
+    // check if keepInTray is set to false
+    if (!store.get('keepInTray')) return;
+
+    const icon = nativeImage.createFromPath('./assets/icons/png/icon.png');
     const tray = new Tray(icon);
 
     tray.setToolTip('Reminders');
@@ -62,7 +71,7 @@ function createAddWindow() {
         height: 200
     });
 
-    addWindow.loadFile(path.join(__dirname, './renderer/newReminder.html'));
+    addWindow.loadFile('./renderer/newReminder.html');
 }
 
 // Listen for app to be ready
@@ -83,6 +92,7 @@ app.whenReady().then(() => {
     });
 });
 
+// Menu template
 const menu = [
     ...(isMac ? [{
         label: app.name,
@@ -103,11 +113,20 @@ const menu = [
                 accelerator: 'CmdOrCtrl+A',
                 click: createAddWindow
             },
+            {
+                label: 'Keep in tray',
+                type: 'checkbox',
+                checked: store.get('keepInTray'),
+                click: e => {
+                    store.set('keepInTray', e.checked);
+                    app.relaunch();
+                    app.exit();
+                    console.log('Keep in tray ' + store.get('keepInTray'));
+                }
+            },
             {type: 'separator'},
             isMac ? {role: 'close'} : {role: 'quit'}
-
         ]
-        
     },
     ...(!isMac ? [{
         label: 'Help',
@@ -120,6 +139,7 @@ const menu = [
     }] : [])
 ];
 
+// Tray menu
 const trayMenu = [
     {
         label: 'Open Reminders',
@@ -145,7 +165,14 @@ const trayMenu = [
     },
     {
         label: 'Keep in tray',
-        type: 'checkbox'
+        type: 'checkbox',
+        checked: store.get('keepInTray'),
+        click: e => {
+            store.set('keepInTray', e.checked);
+            app.relaunch();
+            app.exit();
+            console.log('Keep in tray ' + store.get('keepInTray'));
+        }
     },
     {
         label: 'Quit',
