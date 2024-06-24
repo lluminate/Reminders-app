@@ -1,8 +1,9 @@
 const electron = require('electron');
+const { type } = require('os');
 const path = require('path');
 
 // Set environment
-process.env.NODE_ENV = 'production';
+process.env.NODE_ENV = 'development';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const isMac = process.platform === 'darwin';
@@ -53,6 +54,17 @@ function createTray() {
     tray.setContextMenu(Menu.buildFromTemplate(trayMenu));
 }
 
+// Create add window
+function createAddWindow() {
+    const addWindow = new BrowserWindow({
+        title: 'New Reminder',
+        width: 300,
+        height: 200
+    });
+
+    addWindow.loadFile(path.join(__dirname, './renderer/newReminder.html'));
+}
+
 // Listen for app to be ready
 app.whenReady().then(() => {
     createMainWindow();
@@ -76,13 +88,26 @@ const menu = [
         label: app.name,
         submenu: [
             {
-                label: 'About',
+                label: 'About Reminders',
                 click: createAboutWindow
-            }
+            },
+            {type: 'separator'},
+            {role: 'quit'}
         ]
     }] : []),
     {
-        role: 'fileMenu',
+        label: 'File',
+        submenu: [
+            {
+                label: 'New Reminder',
+                accelerator: 'CmdOrCtrl+A',
+                click: createAddWindow
+            },
+            {type: 'separator'},
+            isMac ? {role: 'close'} : {role: 'quit'}
+
+        ]
+        
     },
     ...(!isMac ? [{
         label: 'Help',
@@ -98,11 +123,29 @@ const menu = [
 const trayMenu = [
     {
         label: 'Open Reminders',
-        click: createMainWindow
+        click: () => {
+            if(BrowserWindow.getAllWindows().length === 0){
+                createMainWindow();
+            }
+        }
+    },
+    {
+        label: 'New Reminder',
+        click: createAddWindow
+    },
+    {
+        type: 'separator'
     },
     {
         label: 'About Reminders...',
         click: createAboutWindow
+    },
+    {
+        type: 'separator'
+    },
+    {
+        label: 'Keep in tray',
+        type: 'checkbox'
     },
     {
         label: 'Quit',
