@@ -1,130 +1,118 @@
 const electron = require('electron');
-const url = require('url');
 const path = require('path');
 
-const {app, BrowserWindow, Menu, ipcMain} = electron;
-
 // Set environment
-process.env.NODE_ENV = 'development';
+process.env.NODE_ENV = 'production';
 
-let mainWindow;
-let addWindow;
+const isDev = process.env.NODE_ENV !== 'production';
+const isMac = process.platform === 'darwin';
 
-// Listen for app to be ready
-app.on('ready', function(){
-    // Create new window
-    mainWindow = new BrowserWindow({
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        }
-    });
-    // Load html into window
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'mainWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));
-    //Quit app when closed
-    mainWindow.on('closed', function(){
-        app.quit();
+const {app, BrowserWindow, Menu, Tray, nativeImage} = electron;
+
+//Set app name
+app.setName('Reminders');
+
+// Create main window
+function createMainWindow() {
+    const mainWindow = new BrowserWindow({
+        title: 'Reminders'
     });
 
-    // Build menu from template
-    const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
-    // Insert menu
-    Menu.setApplicationMenu(mainMenu);
-});
+    // Open dev tools if not in production
+    if(isDev){
+        mainWindow.webContents.openDevTools();
+    }
 
-// Handle create add window
-function createAddWindow(){
-    // Create new window
-    addWindow = new BrowserWindow({
+    mainWindow.loadFile(path.join(__dirname, './renderer/mainWindow.html'));
+}
+
+// Create about window
+function createAboutWindow() {
+    const aboutWindow = new BrowserWindow({
+        title: 'About',
         width: 300,
-        height: 200,
-        title: 'Add Reminder',
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        }
+        height: 450,
+        resizable: false,
     });
-    // Load html into window
-    addWindow.loadURL(url.format({
-        pathname: path.join(__dirname, 'addWindow.html'),
-        protocol: 'file:',
-        slashes: true
-    }));
 
-    addWindow.show();
+    aboutWindow.loadFile(path.join(__dirname, './renderer/about.html'));
 
-    // Garbage collection handle
-    addWindow.on('closed', function(){
-        addWindow = null;
+    // Intercept link clicks to open in external browser
+    aboutWindow.webContents.on('will-navigate', (e, url) => {
+        e.preventDefault();
+        electron.shell.openExternal(url);
     });
 }
 
-//catch event:add
-ipcMain.on('event:add', (ipcEvent, event) => {
-    console.log(event);
-    mainWindow.webContents.send('event:add', event);
-    addWindow.close();
+//Create Tray
+function createTray() {
+    const icon = nativeImage.createFromPath(path.join(__dirname, './assets/icons/png/icon.png'));
+    const tray = new Tray(icon);
+
+    tray.setToolTip('Reminders');
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenu));
+}
+
+// Listen for app to be ready
+app.whenReady().then(() => {
+    createMainWindow();
+
+    // Implement menu
+    const mainMenu = Menu.buildFromTemplate(menu);
+    Menu.setApplicationMenu(mainMenu);
+
+    // Implement tray
+    createTray();
+
+    app.on('activate', () => {
+        if(BrowserWindow.getAllWindows().length === 0){
+            createMainWindow();
+        }
+    });
 });
 
-// Create menu template
-const mainMenuTemplate = [
-    {
-        label: 'File',
+const menu = [
+    ...(isMac ? [{
+        label: app.name,
         submenu: [
             {
-                label: 'Add Item',
-                click(){
-                    createAddWindow();
-                }
-            },
-            {
-                label: 'Clear Events',
-                click(){
-                    mainWindow.webContents.send('event:clear');
-                }
-            },
-            {
-                label: 'Quit',
-                accelerator: process.platform == 'darwin' ? 'Command+Q' : 'Ctrl+Q',
-                click(){
-                    app.quit();
-                }
+                label: 'About',
+                click: createAboutWindow
             }
         ]
+    }] : []),
+    {
+        role: 'fileMenu',
+    },
+    ...(!isMac ? [{
+        label: 'Help',
+        submenu: [
+            {
+                label: 'About',
+                click: createAboutWindow
+            }
+        ]
+    }] : [])
+];
+
+const trayMenu = [
+    {
+        label: 'Open Reminders',
+        click: createMainWindow
+    },
+    {
+        label: 'About Reminders...',
+        click: createAboutWindow
+    },
+    {
+        label: 'Quit',
+        accelerator: 'CmdOrCtrl+Q',
+        click: () => app.quit()
     }
 ];
 
-// If mac, add empty object to menu
-if(process.platform == 'darwin'){
-    mainMenuTemplate.unshift({label: 'Reminders'});
-}
-
-// Add developer tools item if not in production
-if(process.env.NODE_ENV !== 'production'){
-    mainMenuTemplate.push({
-        label: 'Developer Tools',
-        submenu: [
-            {
-                label: 'Toggle DevTools',
-                accelerator: process.platform == 'darwin' ? 'Command+I' : 'Ctrl+I',
-                click(item, focusedWindow){
-                    focusedWindow.toggleDevTools();
-                }
-            },
-
-            {
-                label: 'Reload',
-                accelerator: process.platform == 'darwin' ? 'Command+R' : 'Ctrl+R',
-                click(item, focusedWindow){
-                    focusedWindow.reload();
-                }
-            }
-        ]
-    });
-}
+app.on('window-all-closed', () => {
+    if(!isMac) {
+        app.quit();
+    }
+});

@@ -1,5 +1,6 @@
 {
   "name": "reminders-app",
+  "productName": "Reminders App",
   "version": "1.0.0",
   "description": "Reminders desktop app",
   "main": "main.js",
