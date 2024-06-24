@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>New Reminder</title>
+    <title>New Reminder</title> 
 </head>
 <body>
     <form>
@@ -12,7 +12,15 @@
         <button type="submit">Add</button>
     </form>
     <script>
-        
+        const form = document.querySelector('form')
+        form.addEventListener('submit', submitForm);
+
+        function submitForm(e){
+            e.preventDefault();
+            const event = document.querySelector('#event').value;
+            window.electronAPI.send('reminder:add', event);
+            window.close();
+        }
     </script>
 </body>
 </html>

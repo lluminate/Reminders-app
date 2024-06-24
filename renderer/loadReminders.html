@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Load Reminders</title>
+</head>
+<body>
+    <h1>Load Reminders</h1>
+    <input type="file" id="file" accept=".json">
+    <button id="confirm" onclick="confirmLoad()">OK</button>
+    <button id="cancel" onclick="window.close()">Cancel</button>
+    <script>
+        const file = document.getElementById('file');
+
+        function confirmLoad() {
+            // Get file path
+            const loadPath = file.files[0].path;
+            // Send path to main process
+            window.electronAPI.send('reminder:load', loadPath);
+            // Close window
+            window.close();
+        }
+    </script>
+</body>
+</html>

@@ -1,8 +1,14 @@
 import electron from 'electron';
 import Store from 'electron-store';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+
+// Set __dirname
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Import modules
-const {app, BrowserWindow, Menu, Tray, nativeImage} = electron;
+const {app, BrowserWindow, Menu, Tray, nativeImage, ipcMain} = electron;
 
 // Set environment
 process.env.NODE_ENV = 'development';
@@ -19,10 +25,18 @@ app.setName('Reminders');
 // Init store & defaults
 const store = new Store();
 
+let mainWindow;
+
+
 // Create main window
 function createMainWindow() {
-    const mainWindow = new BrowserWindow({
-        title: 'Reminders'
+    mainWindow = new BrowserWindow({
+        title: 'Reminders',
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
     });
 
     // Open dev tools if not in production
@@ -35,11 +49,16 @@ function createMainWindow() {
 
 // Create about window
 function createAboutWindow() {
-    const aboutWindow = new BrowserWindow({
+    let aboutWindow = new BrowserWindow({
         title: 'About',
         width: 300,
         height: 450,
         resizable: false,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
     });
 
     aboutWindow.loadFile('./renderer/about.html');
@@ -48,6 +67,13 @@ function createAboutWindow() {
     aboutWindow.webContents.on('will-navigate', (e, url) => {
         e.preventDefault();
         electron.shell.openExternal(url);
+    });
+
+    aboutWindow.show();
+
+    // Garbage collection
+    aboutWindow.on('close', () => {
+        aboutWindow = null;
     });
 }
 
@@ -65,14 +91,88 @@ function createTray() {
 
 // Create add window
 function createAddWindow() {
-    const addWindow = new BrowserWindow({
+    let addWindow = new BrowserWindow({
         title: 'New Reminder',
         width: 300,
-        height: 200
+        height: 200,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
     });
 
     addWindow.loadFile('./renderer/newReminder.html');
+
+    addWindow.show();
+
+    // Garbage collection
+    addWindow.on('close', () => {
+        addWindow = null;
+    });
 }
+
+// Create restart window
+function createRestartWindow() {
+    let restartWindow = new BrowserWindow({
+        title: 'Restart Required',
+        width: 300,
+        height: 200,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
+    });
+
+    restartWindow.loadFile('./renderer/restart.html');
+
+    restartWindow.show();
+
+    // Garbage collection
+
+    restartWindow.on('close', () => {
+        restartWindow = null;
+    });
+}
+
+// Create load window
+function createLoadWindow() {
+    let loadWindow = new BrowserWindow({
+        title: 'Load Reminders',
+        width: 300,
+        height: 200,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, './renderer/js/preload.js')
+        }
+    });
+
+    loadWindow.loadFile('./renderer/loadReminders.html');
+
+    loadWindow.show();
+
+    // Garbage collection
+    loadWindow.on('close', () => {
+        loadWindow = null;
+    });
+}
+
+ipcMain.on('app:restart', () => {
+    app.relaunch();
+    app.quit();
+});
+
+ipcMain.on('reminder:add', (ipcEvent, event) => {
+    console.log(event);
+    mainWindow.webContents.send('reminder:add', event);
+});
+
+ipcMain.on('reminder:load', (ipcEvent, loadPath) => {
+    store.set('loadPath', loadPath);
+    console.log(store.get('loadPath'));
+});
 
 // Listen for app to be ready
 app.whenReady().then(() => {
@@ -114,13 +214,17 @@ const menu = [
                 click: createAddWindow
             },
             {
+                label: 'Load Reminders',
+                click: createLoadWindow
+            },
+            {
                 label: 'Keep in tray',
                 type: 'checkbox',
                 checked: store.get('keepInTray'),
+                tooltip: 'Requires Restart',
                 click: e => {
                     store.set('keepInTray', e.checked);
-                    app.relaunch();
-                    app.exit();
+                    createRestartWindow();
                     console.log('Keep in tray ' + store.get('keepInTray'));
                 }
             },
@@ -167,10 +271,10 @@ const trayMenu = [
         label: 'Keep in tray',
         type: 'checkbox',
         checked: store.get('keepInTray'),
+        tooltip: 'Requires Restart',
         click: e => {
             store.set('keepInTray', e.checked);
-            app.relaunch();
-            app.exit();
+            createRestartWindow();
             console.log('Keep in tray ' + store.get('keepInTray'));
         }
     },
@@ -180,6 +284,18 @@ const trayMenu = [
         click: () => app.quit()
     }
 ];
+
+if(isDev){
+    menu.push({
+        label: 'Developer',
+        submenu: [
+            {role: 'reload'},
+            {role: 'forcereload'},
+            {type: 'separator'},
+            {role: 'toggledevtools'}
+        ]
+    });
+}
 
 app.on('window-all-closed', () => {
     if(!isMac) {
