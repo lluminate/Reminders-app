@@ -1,0 +1,14 @@
+{
+  "name": "reminders-app",
+  "version": "1.0.0",
+  "description": "Reminders desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Victor Yang",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^31.0.2"
+  }
+}
