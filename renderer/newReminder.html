@@ -6,8 +6,20 @@
 <body>
     <form>
         <div>
-            <label>Enter Event</label>
-            <input type="text" name="event" id="event" autofocus>
+            <label>Enter Event Name</label>
+            <input type="text" name="name" id="name" autofocus>
+        </div>
+        <div>
+            <label>Enter Event Description</label>
+            <textarea name="description" id="description" style="width: 95%;height: 100px;"></textarea>
+        </div>
+        <div>
+            <label>Enter Event Date</label>
+            <input type="date" name="date" id="date">
+        </div>
+        <div>
+            <label>Enter Event Time</label>
+            <input type="time" name="time" id="time">
         </div>
         <button type="submit">Add</button>
     </form>
@@ -17,7 +29,19 @@
 
         function submitForm(e){
             e.preventDefault();
-            const event = document.querySelector('#event').value;
+            const name = document.querySelector('#name').value;
+            const description = document.querySelector('#description').value;
+            const date = document.querySelector('#date').value;
+            const time = document.querySelector('#time').value;
+
+            //Make list of all the values
+            const event = {
+                name,
+                description,
+                date,
+                time
+            }
+
             window.electronAPI.send('reminder:add', event);
             window.close();
         }

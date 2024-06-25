@@ -2,6 +2,7 @@ import electron from 'electron';
 import Store from 'electron-store';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs, { read } from 'fs';
 
 
 // Set __dirname
@@ -26,7 +27,7 @@ app.setName('Reminders');
 const store = new Store();
 
 let mainWindow;
-
+let remindersList = [];
 
 // Create main window
 function createMainWindow() {
@@ -35,7 +36,7 @@ function createMainWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, './renderer/js/preload.js')
+            preload: path.join(__dirname, './preload.js')
         }
     });
 
@@ -57,7 +58,7 @@ function createAboutWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, './renderer/js/preload.js')
+            preload: path.join(__dirname, './preload.js')
         }
     });
 
@@ -94,11 +95,11 @@ function createAddWindow() {
     let addWindow = new BrowserWindow({
         title: 'New Reminder',
         width: 300,
-        height: 200,
+        height: 300,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, './renderer/js/preload.js')
+            preload: path.join(__dirname, './preload.js')
         }
     });
 
@@ -121,7 +122,7 @@ function createRestartWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, './renderer/js/preload.js')
+            preload: path.join(__dirname, './preload.js')
         }
     });
 
@@ -145,7 +146,7 @@ function createLoadWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, './renderer/js/preload.js')
+            preload: path.join(__dirname, './preload.js')
         }
     });
 
@@ -159,6 +160,59 @@ function createLoadWindow() {
     });
 }
 
+// Read saved JSON file and set remindersList
+function readJSONFile(filePath) {
+    // Check if file exists
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        // Check for error
+        if(err){
+            console.log(err);
+            return;
+        }
+
+        // Log file path
+        console.log("Reading file from: " + filePath);
+
+        // Parse JSON data and check for errors
+        let reminders;
+        try {
+            reminders = JSON.parse(data);
+        } catch (err) {
+            console.log(err);
+            return;
+        }
+
+        //convert reminders to array
+        remindersList = Object.values(reminders);
+        console.log("Reminders file read successfully");
+    });
+}
+
+// Add reminder and save to JSON file
+function saveJSONFile(filePath, event) {
+    // Add to remindersList
+    remindersList.push(event);
+
+    console.log(remindersList);
+
+    // Convert remindersList to JSON
+    let reminders = {};
+    for(let i = 0; i < remindersList.length; i++){
+        reminders[i] = remindersList[i];
+    }
+    
+
+    // Write to JSON file
+    fs.writeFile(filePath, JSON.stringify(reminders), (err) => {
+        if(err){
+            console.log(err);
+            return;
+        }
+
+        console.log("Reminders saved to file");
+    });
+}
+
 ipcMain.on('app:restart', () => {
     app.relaunch();
     app.quit();
@@ -166,12 +220,16 @@ ipcMain.on('app:restart', () => {
 
 ipcMain.on('reminder:add', (ipcEvent, event) => {
     console.log(event);
+    
+    // Add to remindersList
+    saveJSONFile(store.get('loadPath'), event);
+
     mainWindow.webContents.send('reminder:add', event);
 });
 
 ipcMain.on('reminder:load', (ipcEvent, loadPath) => {
     store.set('loadPath', loadPath);
-    console.log(store.get('loadPath'));
+    readJSONFile(store.get('loadPath'));
 });
 
 // Listen for app to be ready
@@ -181,6 +239,8 @@ app.whenReady().then(() => {
     // Implement menu
     const mainMenu = Menu.buildFromTemplate(menu);
     Menu.setApplicationMenu(mainMenu);
+
+    readJSONFile(store.get('loadPath'));
 
     // Implement tray
     createTray();
