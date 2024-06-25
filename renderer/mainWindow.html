@@ -5,26 +5,45 @@
 </head>
 <body>
     <h1>Reminders</h1>
-    <ul></ul>
+    <ol id="mainList"></ol>
 
 <script>
-    const ul = document.querySelector('ul');
+    const mainList = document.getElementById('mainList');
 
-    // Add event
-    window.electronAPI.receive('reminder:add', (event) => {
-        const li = document.createElement('li');
-        const eventText = document.createTextNode(event);
-        li.appendChild(eventText);
-        ul.appendChild(li);
+    // update list
+    window.electronAPI.receive('reminder:update', (remindersList) => {
+        mainList.innerHTML = '';
+        console.log(remindersList);
+        
+        for (let i = 0; i < remindersList.length; i++) {
+            const li = document.createElement('li');
+            const ul = document.createElement('ul');
+            //Get name item in the list
+            
+            ul.innerHTML = `<li>Description: ${remindersList[i].description}</li>
+                            <li>Date: ${remindersList[i].date}</li>
+                            <li>Time: ${remindersList[i].time}</li>`;
+            li.textContent = remindersList[i].name;
+            //Add class to the li element
+            li.classList.add('reminderItem');
+            li.setAttribute('name', remindersList[i].name);
+            li.appendChild(ul);
+            mainList.appendChild(li);
+        }
     });
 
-    // Remove event
-    ul.addEventListener('dblclick', removeEvent);
+    // listener for right click on reminderItem class objects
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.classList.contains('reminderItem')) {
+            e.preventDefault();
+            window.electronAPI.send('reminder:contextMenu', e.target.getAttribute('name'));
+            console.log(e.target.getAttribute('name'));
+        }
+    });
 
-    function removeEvent(e){
-        e.target.remove();
+    onload = () => {
+        window.electronAPI.send('reminder:add');
     }
-
 
 </script>
 </body>

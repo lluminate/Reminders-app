@@ -33,6 +33,9 @@ let remindersList = [];
 function createMainWindow() {
     mainWindow = new BrowserWindow({
         title: 'Reminders',
+        //if in production, set width and height to 400 and 800 else width doubles
+        width: isDev ? 800 : 400,
+        height: 800,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -189,11 +192,17 @@ function readJSONFile(filePath) {
 }
 
 // Add reminder and save to JSON file
-function saveJSONFile(filePath, event) {
-    // Add to remindersList
-    remindersList.push(event);
+function saveJSONFile(filePath, event = {}) {
 
-    console.log(remindersList);
+    //check if event is empty
+    if(event.name !== undefined){
+        // Add to remindersList
+        remindersList.push(event);
+        console.log(remindersList);
+        console.log("Event added");
+    } else {
+        console.log("No event to add");
+    }
 
     // Convert remindersList to JSON
     let reminders = {};
@@ -224,12 +233,33 @@ ipcMain.on('reminder:add', (ipcEvent, event) => {
     // Add to remindersList
     saveJSONFile(store.get('loadPath'), event);
 
-    mainWindow.webContents.send('reminder:add', event);
+    mainWindow.webContents.send('reminder:update', remindersList);
 });
 
 ipcMain.on('reminder:load', (ipcEvent, loadPath) => {
     store.set('loadPath', loadPath);
     readJSONFile(store.get('loadPath'));
+
+    mainWindow.webContents.send('reminder:update', remindersList);
+});
+
+ipcMain.on('reminder:contextMenu', (ipcEvent, context) => {
+    const template = [
+        {
+            label: 'Edit',
+            click: () => {
+                console.log('Edit '+ context);
+            }
+        },
+        {
+            label: 'Delete',
+            click: () => {
+                console.log('Delete ' + context);
+            }
+        }
+    ]
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({ window: BrowserWindow.fromWebContents(ipcEvent.sender) })
 });
 
 // Listen for app to be ready
@@ -276,6 +306,13 @@ const menu = [
             {
                 label: 'Load Reminders',
                 click: createLoadWindow
+            },
+            {
+                label: 'Save Reminders',
+                accelerator: 'CmdOrCtrl+S',
+                click: () => {
+                    saveJSONFile(store.get('loadPath'));
+                }
             },
             {
                 label: 'Keep in tray',
